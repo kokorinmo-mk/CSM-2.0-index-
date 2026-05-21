@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>CSM 2.0 — Оценка компетенций и Тест</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+    <div class="card" id="mainCard"></div>
+    <footer>📌 Прогресс автоматически сохраняется в браузере</footer>
+</div>
+
+<script>
+    // ⚠️ ВАШИ URL ИЗ APPS SCRIPT (для сохранения результатов) ⚠️
+    const SELF_ASSESSMENT_URL = "https://script.google.com/macros/s/AKfycbyHPLQ7gZGtnZYTrfnAZNBpuo3Ea5rwbsP9rbBiIAYU2ttUs_i8oS03_Iut-S80Sewb/exec";
+    const TEST_RESULTS_URL = "https://script.google.com/macros/s/AKfycbyA95RzcVlbW7UxDIFC4WcfKPpP3_niERw8dN39LJzrYnMG85IS3YnYpPyVTTet8b1L/exec";
+    const TEST_QUESTIONS_URL = "https://script.google.com/macros/s/AKfycbymZueJVozXFoH2wxfJM3jAGXg08mhwrzVAQMKmpR7mm4XQWQKNe-AHYz-iryA8QVqUYg/exec";
+    
+    // ⚠️ ВАШ URL ОТ LOCAL TUNNEL (замените!) ⚠️
+    const LOCAL_SERVER_URL = "https://deep-items-ring.loca.lt";  // 👈 СЮДА ВСТАВЬТЕ ВАШ URL
+    
+    // ============================================================
+    // БЛОК 1: САМООЦЕНКА КОМПЕТЕНЦИЙ (оценка от 1 до 10)
+    // ============================================================
+    
+    const AREAS_SELF = [
+        { name: "Область 1. Осознание (тренды и цифровая трансформация)", questions: [
+            "Понимаю тренды: AI, Big Data, IoT, Web 3.0, Cloud, Blockchain",
+            "Понимаю цели, задачи и архитектуру цифровой трансформации банка",
+            "Знаю отраслевые кейсы и особенности технологического развития в нашей отрасли"
+        ]},
+        { name: "Область 2. Стратегия", questions: [
+            "Мыслю стратегически (вижу картину на 3–5 лет)",
+            "Знаю Стратегию Сбера и КПБ бизнес-модель сегмента",
+            "Могу описать бизнес-модель компании через Business Model Canvas",
+            "Умею находить точки роста и формулировать гипотезы трансформации (карта гипотез)",
+            "Понимаю модели управления цифровой трансформацией и цифровые роли в компании",
+            "Разделяю концепцию LoveMark и человекоцентричности"
+        ]},
+        { name: "Область 3. Реинжиниринг процессов и оргструктуры", questions: [
+            "Понимаю цели и задачи клиентских исследований",
+            "Владею бизнес-анализом и реинжинирингом процессов",
+            "Могу описать и спроектировать клиентский путь (Customer Journey Map, CJM)",
+            "Знаю цифровые Core-продукты Сбера (финтех)",
+            "Знаю финансовые и транзакционные Core-продукты Сбера",
+            "Понимаю основы IT-архитектуры",
+            "Могу провести финансовую и экономическую оценку проектов"
+        ]},
+        { name: "Область 4. Проектирование и разработка решения", questions: [
+            "Владею продуктовым менеджментом и продуктовым мышлением",
+            "Владею проектным менеджментом (Agile, Waterfall, Sbergile, PMBok, IPMA)",
+            "Понимаю основы управления процессом разработки ПО",
+            "Знаю партнёрскую программу Сбера"
+        ]},
+        { name: "Область 5. Внедрение и развитие решения", questions: [
+            "Знаю форматы партнёрств и основы патентного права",
+            "Понимаю процессы постановки решений на Продуктовую полку Сбера"
+        ]},
+        { name: "Область 6. Общесистемные компетенции и методология проектов развития", questions: [
+            "Знаю процесс цифровой трансформации (П3181)",
+            "Владею инструментами CSM при реализации проектов (ЕФС «НашБизнес», АС «Эксперт»)",
+            "Использую генеративные модели (GigaChat) в работе над проектами",
+            "Понимаю систему мотивации CSM"
+        ]},
+        { name: "Область 7. Отраслевые компетенции", questions: [
+            "Анализирую рынок, тренды, драйверы, госрегулирование и позицию отрасли",
+            "Знаю специфику отрасли (производство, финансовый анализ, ключевые риски, операционные KPI)",
+            "Ориентируюсь в продуктах и финансировании (кредитные/некредитные решения, ВЭД-продукты, проектное финансирование)"
+        ]},
+        { name: "Область 8. Soft skills", questions: [
+            "Владею системным мышлением и решением проблем",
+            "Умею управлять результатом и несу ответственность",
+            "Управляю собой (эмоции, время, стресс)"
+        ]}
+    ];
+
+    let selfAnswers = {
+        userName: "",
+        userEmail: "",
+        ratings: []
+    };
+    let selfCurrentArea = 0;
+    let selfCompleted = false;
+
+    function initSelfRatings() {
+        const totalQuestions = AREAS_SELF.reduce((sum, area) => sum + area.questions.length, 0);
+        if (selfAnswers.ratings.length !== totalQuestions) {
+            selfAnswers.ratings = new Array(totalQuestions).fill(null);
+        }
+    }
+
+    function loadSelfFromLocalStorage() {
+        const saved = localStorage.getItem("self_assessment_v2");
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                selfAnswers.userName = parsed.userName || "";
+                selfAnswers.userEmail = parsed.userEmail || "";
+                selfAnswers.ratings = parsed.ratings || [];
+                initSelfRatings();
+            } catch(e) { initSelfRatings(); }
+        } else {
+            initSelfRatings();
+        }
+    }
+
+    function saveSelfToLocalStorage() {
+        localStorage.setItem("self_assessment_v2", JSON.stringify({
+            userName: selfAnswers.userName,
+            userEmail: selfAnswers.userEmail,
+            ratings: selfAnswers.ratings
+        }));
+    }
+
+    function getSelfQuestionIndex(areaIdx, qIdx) {
+        let idx = 0;
+        for (let a = 0; a < areaIdx; a++) {
+            idx += AREAS_SELF[a].questions.length;
+        }
+        return idx + qIdx;
+    }
+
+    function validateSelfCurrentArea() {
+        const area = AREAS_SELF[selfCurrentArea];
+        let startIdx = 0;
+        for (let a = 0; a < selfCurrentArea; a++) {
+            startIdx += AREAS_SELF[a].questions.length;
+        }
+        for (let i = 0; i < area.questions.length; i++) {
+            if (selfAnswers.ratings[startIdx + i] === null || selfAnswers.ratings[startIdx + i] === undefined) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function validateAllSelf() {
+        return selfAnswers.ratings.every(r => r !== null && r !== undefined);
+    }
+
+    function renderSelfAssessment() {
+        const card = document.getElementById("mainCard");
+        const area = AREAS_SELF[selfCurrentArea];
+        const totalAreas = AREAS_SELF.length;
+        const percent = ((selfCurrentArea + 1) / totalAreas) * 100;
+
+        let html = `
+            <div class="header">
+                <h1>📊 Самооценка компетенций CSM 2.0</h1>
+                <p>Оцените каждый пункт от 1 до 10</p>
+                <details class="scale-info">
+                    <summary>📏 Что означают оценки?</summary>
+                    <div class="scale-info-content">
+                        <span>• 1 — Не знаю, что это</span>
+                        <span>• 2 — Слышал термин</span>
+                        <span>• 3 — Могу дать определение</span>
+                        <span>• 4 — Изучал теорию</span>
+                        <span>• 5 — Применял под руководством</span>
+                        <span>• 6 — Применяю в простых ситуациях</span>
+                        <span>• 7 — Применяю уверенно</span>
+                        <span>• 8 — Применяю в сложных задачах</span>
+                        <span>• 9 — Могу обучать других</span>
+                        <span>• 10 — Внедрял в масштабе банка</span>
+                    </div>
+                </details>
+            </div>
+            <div class="progress-section">
+                <div class="progress-bar"><div class="progress-fill" style="width:${percent}%"></div></div>
+                <div class="progress-text">Область ${selfCurrentArea+1} из ${totalAreas}</div>
+            </div>
+            <div class="content">
+                <div class="user-info">
+                    <h3>👤 Ваши данные</h3>
+                    <div class="form-group"><label>ФИО *</label><input type="text" id="fio" value="${escapeHtml(selfAnswers.userName)}" placeholder="Иванов Иван Иванович"></div>
+                    <div class="form-group"><label>📧 Электронная почта *</label><input type="email" id="email" value="${escapeHtml(selfAnswers.userEmail)}" placeholder="example@domain.com"></div>
+                </div>
+                <div class="area-title">📌 ${escapeHtml(area.name)}</div>
+        `;
+
+        for (let i = 0; i < area.questions.length; i++) {
+            const globalIdx = getSelfQuestionIndex(selfCurrentArea, i);
+            const savedRating = selfAnswers.ratings[globalIdx];
+            html += `<div class="question-block"><div class="question-text">${escapeHtml(area.questions[i])}</div><div class="rating-scale" data-global-idx="${globalIdx}">`;
+            for (let rating = 1; rating <= 10; rating++) {
+                const isSelected = (savedRating === rating);
+                html += `<label class="rating-option ${isSelected ? 'selected' : ''}" data-rating="${rating}">
+                            <input type="radio" name="q_${globalIdx}" value="${rating}" ${isSelected ? 'checked' : ''}>
+                            <span>${rating}</span>
+                         </label>`;
+            }
+            html += `</div></div>`;
+        }
+
+        html += `<div class="navigation">`;
+        if (selfCurrentArea > 0) html += `<button class="secondary" id="prevBtn">← Назад</button>`;
+        else html += `<div></div>`;
+        if (selfCurrentArea < totalAreas - 1) html += `<button id="nextBtn">Далее →</button>`;
+        else html += `<button id="submitSelfBtn" class="submit-btn">✅ Завершить самооценку</button>`;
+        html += `</div></div>`;
+
+        card.innerHTML = html;
+
+        document.getElementById("fio")?.addEventListener('input', (e) => { selfAnswers.userName = e.target.value; saveSelfToLocalStorage(); });
+        document.getElementById("email")?.addEventListener('input', (e) => { selfAnswers.userEmail = e.target.value; saveSelfToLocalStorage(); });
+
+        for (let i = 0; i < area.questions.length; i++) {
+            const globalIdx = getSelfQuestionIndex(selfCurrentArea, i);
+            const radios = document.querySelectorAll(`input[name="q_${globalIdx}"]`);
+            radios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    selfAnswers.ratings[globalIdx] = parseInt(e.target.value);
+                    saveSelfToLocalStorage();
+                    const container = e.target.closest('.rating-scale');
+                    if (container) {
+                        Array.from(container.children).forEach(child => child.classList.remove('selected'));
+                        e.target.closest('.rating-option')?.classList.add('selected');
+                    }
+                });
+            });
+        }
+
+        document.getElementById("prevBtn")?.addEventListener('click', () => {
+            if (validateSelfCurrentArea()) { selfCurrentArea--; renderSelfAssessment(); window.scrollTo({top:0, behavior:'smooth'}); }
+            else showMessage("❌ Оцените все утверждения в этой области", 'error');
+        });
+        document.getElementById("nextBtn")?.addEventListener('click', () => {
+            if (validateSelfCurrentArea()) { selfCurrentArea++; renderSelfAssessment(); window.scrollTo({top:0, behavior:'smooth'}); }
+            else showMessage("❌ Оцените все утверждения в этой области", 'error');
+        });
+        document.getElementById("submitSelfBtn")?.addEventListener('click', submitSelfAssessment);
+    }
+
+    function submitSelfAssessment() {
+        if (!selfAnswers.userName?.trim()) { showMessage("❌ Введите ФИО", 'error'); return; }
+        if (!selfAnswers.userEmail?.trim() || !selfAnswers.userEmail.includes('@')) { showMessage("❌ Введите корректный email", 'error'); return; }
+        if (!validateAllSelf()) { showMessage("❌ Оцените все утверждения перед отправкой", 'error'); return; }
+
+        showMessage("⏳ Отправка самооценки...", "success");
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('ru-RU');
+        const timeStr = now.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+        let payload = { userName: selfAnswers.userName, userEmail: selfAnswers.userEmail, date: dateStr, time: timeStr };
+        
+        let idx = 0;
+        for (let a = 0; a < AREAS_SELF.length; a++) {
+            let areaSum = 0;
+            for (let q = 0; q < AREAS_SELF[a].questions.length; q++) {
+                areaSum += selfAnswers.ratings[idx];
+                payload[`area_${a+1}_q${q+1}`] = selfAnswers.ratings[idx];
+                idx++;
+            }
+            const areaAvg = Math.round(areaSum / AREAS_SELF[a].questions.length);
+            payload[`area_${a+1}_avg`] = areaAvg;
+        }
+        
+        const allScores = selfAnswers.ratings.filter(r => r !== null);
+        const overallAvg = allScores.length ? Math.round(allScores.reduce((s,v)=>s+v,0) / allScores.length) : 0;
+        payload.overall_avg = overallAvg;
+
+        fetch(SELF_ASSESSMENT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(() => {
+            showSelfCompleteScreen();
+        }).catch(() => {
+            showMessage("❌ Ошибка отправки. Попробуйте ещё раз.", 'error');
+        });
+    }
+
+    function showSelfCompleteScreen() {
+        selfCompleted = true;
+        const card = document.getElementById("mainCard");
+        card.innerHTML = `
+            <div class="header"><h1>📊 Самооценка компетенций CSM 2.0</h1></div>
+            <div class="thankyou">
+                <h2>🙏 Спасибо, ${escapeHtml(selfAnswers.userName)}!</h2>
+                <p>Ваша самооценка компетенций успешно сохранена в Google Таблицу.</p>
+                <p style="margin: 1rem 0;">📌 Теперь вы можете перейти к тесту.</p>
+                <button id="goToTestBtn" class="submit-btn" style="background: #10b981; margin-top: 0.5rem;">📝 Перейти к тесту →</button>
+            </div>
+        `;
+        document.getElementById("goToTestBtn")?.addEventListener('click', () => {
+            localStorage.removeItem("self_assessment_v2");
+            loadTest();
+        });
+    }
+
+    // ============================================================
+    // БЛОК 2: ТЕСТ (динамический, загрузка из getQuestions.gs)
+    // ============================================================
+
+    let testAreas = [];
+    let testCurrentArea = 0;
+    let testAnswers = { userName: "", userEmail: "", closed: [], open: [] };
+    let testDataLoaded = false;
+
+    function loadTestFromLocalStorage() {
+        if (!testDataLoaded || testAreas.length === 0) return;
+        const saved = localStorage.getItem("csm_test_v3");
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                testAnswers.userName = parsed.userName || selfAnswers.userName || "";
+                testAnswers.userEmail = parsed.userEmail || selfAnswers.userEmail || "";
+                testAnswers.closed = parsed.closed || testAreas.map(() => []);
+                testAnswers.open = parsed.open || testAreas.map(() => "");
+                for (let i = 0; i < testAreas.length; i++) {
+                    if (!testAnswers.closed[i]) testAnswers.closed[i] = [];
+                    while (testAnswers.closed[i].length < testAreas[i].closedCount) testAnswers.closed[i].push(null);
+                }
+            } catch(e) {}
+        } else {
+            testAnswers.userName = selfAnswers.userName || "";
+            testAnswers.userEmail = selfAnswers.userEmail || "";
+            testAnswers.closed = testAreas.map(() => []);
+            testAnswers.open = testAreas.map(() => "");
+            for (let i = 0; i < testAreas.length; i++) {
+                testAnswers.closed[i] = new Array(testAreas[i].closedCount).fill(null);
+            }
+        }
+    }
+
+    function saveTestToLocalStorage() {
+        if (!testDataLoaded) return;
+        localStorage.setItem("csm_test_v3", JSON.stringify({
+            userName: testAnswers.userName,
+            userEmail: testAnswers.userEmail,
+            closed: testAnswers.closed,
+            open: testAnswers.open
+        }));
+    }
+
+    function validateTestCurrentArea() {
+        if (!testDataLoaded) return false;
+        const closed = testAnswers.closed[testCurrentArea];
+        if (!closed) return false;
+        return closed.length === testAreas[testCurrentArea].closedCount && closed.every(v => v !== null && v !== undefined);
+    }
+
+    function renderTest() {
+        if (!testDataLoaded || testAreas.length === 0) return;
+        
+        const card = document.getElementById("mainCard");
+        const area = testAreas[testCurrentArea];
+        const total = testAreas.length;
+        const percent = ((testCurrentArea + 1) / total) * 100;
+
+        let html = `
+            <div class="header">
+                <h1>📋 Тест CSM 2.0</h1>
+                <p>Проверка знаний • 8 областей компетенций</p>
+            </div>
+            <div class="progress-section">
+                <div class="progress-bar"><div class="progress-fill" style="width:${percent}%"></div></div>
+                <div class="progress-text">Область ${testCurrentArea+1} из ${total}</div>
+            </div>
+            <div class="content">
+                <div class="user-info">
+                    <div class="form-group"><label>👤 ФИО *</label><input type="text" id="fio" value="${escapeHtml(testAnswers.userName)}" placeholder="Иванов Иван Иванович"></div>
+                    <div class="form-group"><label>📧 Электронная почта *</label><input type="email" id="email" value="${escapeHtml(testAnswers.userEmail)}" placeholder="example@domain.com"></div>
+                </div>
+                <div class="area-title">📌 ${escapeHtml(area.name)}</div>
+        `;
+
+        for (let i = 0; i < area.closed.length; i++) {
+            const q = area.closed[i];
+            const savedVal = testAnswers.closed[testCurrentArea]?.[i];
+            html += `<div class="question-block"><div class="question-text">${testCurrentArea+1}.${i+1}. ${escapeHtml(q.text)}</div><div class="options">`;
+            for (let optIdx = 0; optIdx < q.options.length; optIdx++) {
+                const letter = String.fromCharCode(65 + optIdx);
+                const isChecked = (savedVal === letter);
+                html += `<label class="option"><input type="radio" name="q_${i}" value="${letter}" ${isChecked ? 'checked' : ''}><span>${escapeHtml(q.options[optIdx])}</span></label>`;
+            }
+            html += `</div></div>`;
+        }
+
+        if (area.open) {
+            html += `<div class="question-block open-question"><div class="question-text">${testCurrentArea+1}.${area.closed.length+1} (открытый). ${escapeHtml(area.openText)}</div>
+                      <textarea id="openAnswer" rows="4">${escapeHtml(testAnswers.open[testCurrentArea] || '')}</textarea></div>`;
+        }
+
+        html += `<div class="navigation">`;
+        if (testCurrentArea > 0) html += `<button class="secondary" id="prevBtn">← Назад</button>`;
+        else html += `<div></div>`;
+        if (testCurrentArea < total-1) html += `<button id="nextBtn">Далее →</button>`;
+        else html += `<button id="submitTestBtn" class="submit-btn">✅ Завершить тест</button>`;
+        html += `</div></div>`;
+
+        card.innerHTML = html;
+
+        document.getElementById("fio")?.addEventListener('input', (e) => { testAnswers.userName = e.target.value; saveTestToLocalStorage(); });
+        document.getElementById("email")?.addEventListener('input', (e) => { testAnswers.userEmail = e.target.value; saveTestToLocalStorage(); });
+
+        for (let i = 0; i < area.closed.length; i++) {
+            const radios = document.querySelectorAll(`input[name="q_${i}"]`);
+            radios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    testAnswers.closed[testCurrentArea][i] = e.target.value;
+                    saveTestToLocalStorage();
+                });
+            });
+        }
+
+        if (area.open) {
+            document.getElementById("openAnswer")?.addEventListener('input', (e) => {
+                testAnswers.open[testCurrentArea] = e.target.value;
+                saveTestToLocalStorage();
+            });
+        }
+
+        document.getElementById("prevBtn")?.addEventListener('click', () => {
+            if (validateTestCurrentArea()) { testCurrentArea--; renderTest(); window.scrollTo({top:0, behavior:'smooth'}); }
+            else showMessage("❌ Ответьте на все закрытые вопросы в этой области", "error");
+        });
+        document.getElementById("nextBtn")?.addEventListener('click', () => {
+            if (validateTestCurrentArea()) { testCurrentArea++; renderTest(); window.scrollTo({top:0, behavior:'smooth'}); }
+            else showMessage("❌ Ответьте на все закрытые вопросы в этой области", "error");
+        });
+        document.getElementById("submitTestBtn")?.addEventListener('click', submitTest);
+    }
+
+    // ============================================================
+    // ФУНКЦИЯ ДЛЯ ОТПРАВКИ ДАННЫХ НА ЛОКАЛЬНЫЙ СЕРВЕР
+    // ============================================================
+    async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
+        console.log("📤 Отправка данных на локальный сервер...");
+        console.log("URL сервера:", LOCAL_SERVER_URL);
+        
+        try {
+            const response = await fetch(`${LOCAL_SERVER_URL}/recommend`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userName: userName,
+                    userEmail: userEmail,
+                    selfRatings: selfRatings,
+                    testScores: testScores
+                })
+            });
+            
+            const data = await response.json();
+            console.log("✅ Ответ сервера:", data);
+            
+            if (data.success) {
+                console.log("📧 Письмо с рекомендациями отправлено!");
+            } else {
+                console.error("❌ Ошибка от сервера:", data.error);
+            }
+        } catch (error) {
+            console.error("❌ Ошибка подключения к серверу:", error);
+            console.error("Проверьте, что сервер запущен (node server.js) и localtunnel работает (lt --port 3000)");
+        }
+    }
+
+    function submitTest() {
+        if (!testAnswers.userName.trim()) { 
+            showMessage("❌ Укажите ФИО", 'error'); 
+            return; 
+        }
+        if (!testAnswers.userEmail.trim() || !testAnswers.userEmail.includes('@')) { 
+            showMessage("❌ Укажите корректный email", 'error'); 
+            return; 
+        }
+
+        // Проверяем, что все вопросы теста отвечены
+        for (let i = 0; i < testAreas.length; i++) {
+            const closedArr = testAnswers.closed[i];
+            if (!closedArr || closedArr.length !== testAreas[i].closedCount || closedArr.some(v => v === null)) {
+                testCurrentArea = i;
+                renderTest();
+                showMessage(`❌ Ответьте на все закрытые вопросы в области ${i+1}`, "error");
+                return;
+            }
+        }
+
+        showMessage("⏳ Отправка результатов теста...", "success");
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('ru-RU');
+        const timeStr = now.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+        // Формируем payload для сохранения результатов теста в Google Sheets
+        let payload = { 
+            userName: testAnswers.userName, 
+            userEmail: testAnswers.userEmail, 
+            date: dateStr, 
+            time: timeStr 
+        };
+
+        // Собираем результаты теста для отправки в Google Sheets
+        const testScoresFlat = [];
+        
+        for (let a = 0; a < testAreas.length; a++) {
+            const area = testAreas[a];
+            const closedAnswers = testAnswers.closed[a];
+            const scores = [];
+            for (let q = 0; q < area.closed.length; q++) {
+                const isCorrect = (closedAnswers[q] === area.closed[q].correct);
+                const percentScore = isCorrect ? 100 : 0;
+                scores.push(percentScore);
+                testScoresFlat.push(percentScore);
+                payload[`area_${a+1}_q${q+1}_percent`] = percentScore;
+            }
+            const avgScore = scores.length ? Math.round(scores.reduce((s,v)=>s+v,0) / scores.length) : 0;
+            payload[`area_${a+1}_avg`] = avgScore;
+            payload[`area_${a+1}_open`] = testAnswers.open[a] || "(не заполнено)";
+        }
+
+        // Отправляем результаты теста в Google Sheets
+        fetch(TEST_RESULTS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(() => {
+            // После сохранения в Google Sheets, отправляем на локальный сервер для рекомендаций
+            sendToLocalServer(
+                testAnswers.userName,
+                testAnswers.userEmail,
+                selfAnswers.ratings,
+                testScoresFlat
+            );
+            
+            // Показываем экран завершения
+            showTestCompleteScreen();
+            
+        }).catch((error) => {
+            console.error("Ошибка при отправке теста:", error);
+            showMessage("❌ Ошибка при отправке. Проверьте интернет-соединение.", "error");
+        });
+    }
+
+    function showTestCompleteScreen() {
+        let totalCorrectSum = 0;
+        let totalClosedCount = 0;
+        for (let a = 0; a < testAreas.length; a++) {
+            for (let q = 0; q < testAreas[a].closed.length; q++) {
+                const isCorr = (testAnswers.closed[a][q] === testAreas[a].closed[q].correct);
+                totalCorrectSum += isCorr ? 100 : 0;
+                totalClosedCount++;
+            }
+        }
+        const overallPercent = totalClosedCount ? Math.round(totalCorrectSum / totalClosedCount) : 0;
+        
+        const card = document.getElementById("mainCard");
+        let gradeText = overallPercent >= 90 ? "🔥 Отлично! Вы эксперт" : (overallPercent >= 75 ? "👍 Хорошо" : (overallPercent >= 50 ? "📚 Средний уровень" : "🎯 Начальный уровень"));
+        
+        card.innerHTML = `
+            <div class="header"><h1>📋 Тест CSM 2.0</h1><p>Результат</p></div>
+            <div class="thankyou">
+                <h2>🙏 Спасибо, ${escapeHtml(testAnswers.userName)}!</h2>
+                <p>Ваш результат теста: <strong>${overallPercent}%</strong> правильных ответов.</p>
+                <p>${gradeText}</p>
+                <p style="font-size:0.9rem; color:#1f6e8c; margin-bottom: 1rem;">✅ Результаты теста успешно отправлены</p>
+                <p style="font-size:0.9rem; color:#10b981; margin-bottom: 1.5rem;">📧 Письмо с рекомендациями отправлено на вашу почту!</p>
+                <button class="close-btn" onclick="closeTest()">🚪 Закрыть тест</button>
+            </div>
+        `;
+        const footer = document.querySelector("footer");
+        if(footer) footer.style.display = "none";
+        localStorage.removeItem("csm_test_v3");
+        localStorage.removeItem("self_assessment_v2");
+    }
+
+    function closeTest() {
+        window.close();
+        alert("Закройте эту вкладку вручную, чтобы завершить тест.");
+    }
+
+    async function loadTestQuestions() {
+        try {
+            showMessage("⏳ Загрузка вопросов теста...", "success");
+            const response = await fetch(TEST_QUESTIONS_URL);
+            const text = await response.text();
+            testAreas = JSON.parse(text);
+            
+            if (testAreas.error || testAreas.length === 0) {
+                throw new Error(testAreas.error || "Нет вопросов");
+            }
+            
+            testDataLoaded = true;
+            testAnswers.closed = testAreas.map(() => []);
+            testAnswers.open = testAreas.map(() => "");
+            for (let i = 0; i < testAreas.length; i++) {
+                testAnswers.closed[i] = new Array(testAreas[i].closedCount).fill(null);
+            }
+            
+            loadTestFromLocalStorage();
+            renderTest();
+        } catch (error) {
+            console.error("Ошибка загрузки теста:", error);
+            const card = document.getElementById("mainCard");
+            card.innerHTML = `
+                <div class="header"><h1>⚠️ Ошибка загрузки теста</h1></div>
+                <div class="thankyou">
+                    <p>Не удалось загрузить вопросы теста.</p>
+                    <p style="font-size:0.8rem; margin-top:1rem;">Проверьте:</p>
+                    <ul style="text-align:left; display:inline-block;">
+                        <li>Что лист "Вопросы" существует в таблице</li>
+                        <li>Что скрипт getQuestions.gs развёрнут и URL правильный</li>
+                    </ul>
+                    <button onclick="location.reload()" style="margin-top:1.5rem;">🔄 Перезагрузить</button>
+                </div>
+            `;
+        }
+    }
+
+    function loadTest() {
+        loadTestQuestions();
+    }
+
+    // Функции-помощники
+    function escapeHtml(str) {
+        if (!str) return "";
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    function showMessage(text, type) {
+        let msgDiv = document.getElementById("dynamicMessage");
+        const mainCard = document.getElementById("mainCard");
+        const contentDiv = mainCard?.querySelector(".content");
+        if (!msgDiv && contentDiv) {
+            msgDiv = document.createElement("div");
+            msgDiv.id = "dynamicMessage";
+            contentDiv.appendChild(msgDiv);
+        } else if (!contentDiv) return;
+        if (msgDiv) msgDiv.innerHTML = `<div class="message ${type}">${escapeHtml(text)}</div>`;
+        setTimeout(() => { if(msgDiv) msgDiv.innerHTML = ''; }, 4000);
+    }
+
+    // СТАРТ: самооценка
+    loadSelfFromLocalStorage();
+    renderSelfAssessment();
+</script>
+</body>
+</html>

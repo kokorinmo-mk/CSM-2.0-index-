@@ -425,12 +425,10 @@
         document.getElementById("submitTestBtn")?.addEventListener('click', submitTest);
     }
 
-    // ============================================================
-    // ФУНКЦИЯ ДЛЯ ОТПРАВКИ ДАННЫХ НА ЛОКАЛЬНЫЙ СЕРВЕР
-    // ============================================================
-    // ============================================================
+// ============================================================
 // ФУНКЦИЯ ДЛЯ ОТПРАВКИ ДАННЫХ НА СЕРВЕР (ТОЛЬКО СРЕДНИЕ)
 // ============================================================
+
 async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
     console.log("📤 Отправка данных на сервер...");
     console.log("URL сервера:", LOCAL_SERVER_URL);
@@ -466,13 +464,10 @@ async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
     }
     
     // ============================================================
-    // ПЕРЕВОДИМ САМООЦЕНКУ ИЗ БАЛЛОВ (1-10) В ПРОЦЕНТЫ (10-100)
+    // ФОРМИРУЕМ ДАННЫЕ В НУЖНОМ ФОРМАТЕ
     // ============================================================
-    const selfAveragesPercent = selfAverages.map(score => Math.round(score * 10));
     
-    // ============================================================
-    // ФОРМИРУЕМ ОБЪЕКТЫ С НАЗВАНИЯМИ ОБЛАСТЕЙ
-    // ============================================================
+    // Список областей
     const areaNames = [
         "Осознание",
         "Стратегия",
@@ -484,16 +479,20 @@ async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
         "Soft skills"
     ];
     
+    // Формируем объект с результатами самооценки
     const selfRatingsFormatted = {};
-    const testScoresFormatted = {};
-    
     for (let i = 0; i < areaNames.length; i++) {
-        selfRatingsFormatted[areaNames[i]] = selfAveragesPercent[i];
-        testScoresFormatted[areaNames[i]] = testAverages[i];
+        selfRatingsFormatted[`Область ${i+1}. ${areaNames[i]}`] = selfAverages[i];
     }
     
-    console.log("📊 Самооценка (%):", selfRatingsFormatted);
-    console.log("📊 Тест (%):", testScoresFormatted);
+    // Формируем объект с результатами теста
+    const testScoresFormatted = {};
+    for (let i = 0; i < areaNames.length; i++) {
+        testScoresFormatted[`Область ${i+1}. ${areaNames[i]}`] = testAverages[i];
+    }
+    
+    console.log("📊 Результаты самооценки:", selfRatingsFormatted);
+    console.log("📊 Результаты теста:", testScoresFormatted);
     
     try {
         const response = await fetch(`${LOCAL_SERVER_URL}/recommend`, {

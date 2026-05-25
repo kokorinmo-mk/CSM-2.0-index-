@@ -428,37 +428,70 @@
     // ============================================================
     // ФУНКЦИЯ ДЛЯ ОТПРАВКИ ДАННЫХ НА ЛОКАЛЬНЫЙ СЕРВЕР
     // ============================================================
-    async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
-        console.log("📤 Отправка данных на локальный сервер...");
-        console.log("URL сервера:", LOCAL_SERVER_URL);
-        
-        try {
-            const response = await fetch(`${LOCAL_SERVER_URL}/recommend`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    userName: userName,
-                    userEmail: userEmail,
-                    selfRatings: selfRatings,
-                    testScores: testScores
-                })
-            });
-            
-            const data = await response.json();
-            console.log("✅ Ответ сервера:", data);
-            
-            if (data.success) {
-                console.log("📧 Письмо с рекомендациями отправлено!");
-            } else {
-                console.error("❌ Ошибка от сервера:", data.error);
-            }
-        } catch (error) {
-            console.error("❌ Ошибка подключения к серверу:", error);
-            console.error("Проверьте, что сервер запущен (node server.js) и localtunnel работает (lt --port 3000)");
+    // ============================================================
+// ФУНКЦИЯ ДЛЯ ОТПРАВКИ ДАННЫХ НА СЕРВЕР (ТОЛЬКО СРЕДНИЕ)
+// ============================================================
+async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
+    console.log("📤 Отправка данных на локальный сервер...");
+    console.log("URL сервера:", LOCAL_SERVER_URL);
+    
+    // Вычисляем средние по областям для самооценки
+    // AREAS_SELF уже определён выше с 8 областями и вопросами
+    const selfAverages = [];
+    let ratingIdx = 0;
+    for (let a = 0; a < AREAS_SELF.length; a++) {
+        let sum = 0;
+        for (let q = 0; q < AREAS_SELF[a].questions.length; q++) {
+            sum += selfRatings[ratingIdx];
+            ratingIdx++;
         }
+        const avg = sum / AREAS_SELF[a].questions.length;
+        selfAverages.push(Math.round(avg * 10) / 10); // округляем до 1 знака
     }
+    
+    // Вычисляем средние по областям для теста
+    // testScoresFlat — это массив процентов по всем вопросам
+    const testAverages = [];
+    let testIdx = 0;
+    for (let a = 0; a < testAreas.length; a++) {
+        let sum = 0;
+        for (let q = 0; q < testAreas[a].closed.length; q++) {
+            sum += testScores[testIdx];
+            testIdx++;
+        }
+        const avg = sum / testAreas[a].closed.length;
+        testAverages.push(Math.round(avg));
+    }
+    
+    console.log("📊 Средние самооценки:", selfAverages);
+    console.log("📊 Средние теста:", testAverages);
+    
+    try {
+        const response = await fetch(`${LOCAL_SERVER_URL}/recommend`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                userName: userName,
+                userEmail: userEmail,
+                selfRatings: selfAverages,
+                testScores: testAverages
+            })
+        });
+        
+        const data = await response.json();
+        console.log("✅ Ответ сервера:", data);
+        
+        if (data.success) {
+            console.log("📧 Письмо с рекомендациями отправлено!");
+        } else {
+            console.error("❌ Ошибка от сервера:", data.error);
+        }
+    } catch (error) {
+        console.error("❌ Ошибка подключения к серверу:", error);
+    }
+}
 
     function submitTest() {
         if (!testAnswers.userName.trim()) { 

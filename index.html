@@ -432,11 +432,14 @@
 // ФУНКЦИЯ ДЛЯ ОТПРАВКИ ДАННЫХ НА СЕРВЕР (ТОЛЬКО СРЕДНИЕ)
 // ============================================================
 async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
-    console.log("📤 Отправка данных на локальный сервер...");
+    console.log("📤 Отправка данных на сервер...");
     console.log("URL сервера:", LOCAL_SERVER_URL);
     
-    // Вычисляем средние по областям для самооценки
-    // AREAS_SELF уже определён выше с 8 областями и вопросами
+    // ============================================================
+    // ВЫЧИСЛЯЕМ СРЕДНИЕ ПО ОБЛАСТЯМ
+    // ============================================================
+    
+    // Самооценка: 8 областей со средними баллами (1-10)
     const selfAverages = [];
     let ratingIdx = 0;
     for (let a = 0; a < AREAS_SELF.length; a++) {
@@ -446,11 +449,10 @@ async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
             ratingIdx++;
         }
         const avg = sum / AREAS_SELF[a].questions.length;
-        selfAverages.push(Math.round(avg * 10) / 10); // округляем до 1 знака
+        selfAverages.push(Math.round(avg * 10) / 10);
     }
     
-    // Вычисляем средние по областям для теста
-    // testScoresFlat — это массив процентов по всем вопросам
+    // Тест: 8 областей со средними процентами (0-100)
     const testAverages = [];
     let testIdx = 0;
     for (let a = 0; a < testAreas.length; a++) {
@@ -463,8 +465,35 @@ async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
         testAverages.push(Math.round(avg));
     }
     
-    console.log("📊 Средние самооценки:", selfAverages);
-    console.log("📊 Средние теста:", testAverages);
+    // ============================================================
+    // ПЕРЕВОДИМ САМООЦЕНКУ ИЗ БАЛЛОВ (1-10) В ПРОЦЕНТЫ (10-100)
+    // ============================================================
+    const selfAveragesPercent = selfAverages.map(score => Math.round(score * 10));
+    
+    // ============================================================
+    // ФОРМИРУЕМ ОБЪЕКТЫ С НАЗВАНИЯМИ ОБЛАСТЕЙ
+    // ============================================================
+    const areaNames = [
+        "Осознание",
+        "Стратегия",
+        "Реинжиниринг процессов и оргструктуры",
+        "Проектирование и разработка решения",
+        "Внедрение и развитие решения",
+        "Общесистемные компетенции и методология проектов развития",
+        "Отраслевые компетенции",
+        "Soft skills"
+    ];
+    
+    const selfRatingsFormatted = {};
+    const testScoresFormatted = {};
+    
+    for (let i = 0; i < areaNames.length; i++) {
+        selfRatingsFormatted[areaNames[i]] = selfAveragesPercent[i];
+        testScoresFormatted[areaNames[i]] = testAverages[i];
+    }
+    
+    console.log("📊 Самооценка (%):", selfRatingsFormatted);
+    console.log("📊 Тест (%):", testScoresFormatted);
     
     try {
         const response = await fetch(`${LOCAL_SERVER_URL}/recommend`, {
@@ -475,8 +504,8 @@ async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
             body: JSON.stringify({
                 userName: userName,
                 userEmail: userEmail,
-                selfRatings: selfAverages,
-                testScores: testAverages
+                selfRatings: selfRatingsFormatted,
+                testScores: testScoresFormatted
             })
         });
         

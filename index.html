@@ -437,6 +437,18 @@ async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
     // ВЫЧИСЛЯЕМ СРЕДНИЕ ПО ОБЛАСТЯМ
     // ============================================================
     
+    // Названия областей в правильном порядке
+    const areaNames = [
+        "Осознание",
+        "Стратегия",
+        "Реинжиниринг процессов и оргструктуры",
+        "Проектирование и разработка решения",
+        "Внедрение и развитие решения",
+        "Общесистемные компетенции и методология проектов развития",
+        "Отраслевые компетенции",
+        "Soft skills"
+    ];
+    
     // Самооценка: 8 областей со средними баллами (1-10)
     const selfAverages = [];
     let ratingIdx = 0;
@@ -464,35 +476,25 @@ async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
     }
     
     // ============================================================
-    // ФОРМИРУЕМ ДАННЫЕ В НУЖНОМ ФОРМАТЕ
+    // ФОРМИРУЕМ ОБЪЕКТЫ С НАИМЕНОВАНИЯМИ ОБЛАСТЕЙ
     // ============================================================
     
-    // Список областей
-    const areaNames = [
-        "Осознание",
-        "Стратегия",
-        "Реинжиниринг процессов и оргструктуры",
-        "Проектирование и разработка решения",
-        "Внедрение и развитие решения",
-        "Общесистемные компетенции и методология проектов развития",
-        "Отраслевые компетенции",
-        "Soft skills"
-    ];
-    
-    // Формируем объект с результатами самооценки
     const selfRatingsFormatted = {};
-    for (let i = 0; i < areaNames.length; i++) {
-        selfRatingsFormatted[`Область ${i+1}. ${areaNames[i]}`] = selfAverages[i];
-    }
-    
-    // Формируем объект с результатами теста
     const testScoresFormatted = {};
+    
     for (let i = 0; i < areaNames.length; i++) {
-        testScoresFormatted[`Область ${i+1}. ${areaNames[i]}`] = testAverages[i];
+        selfRatingsFormatted[areaNames[i]] = selfAverages[i];
+        testScoresFormatted[areaNames[i]] = testAverages[i];
     }
     
-    console.log("📊 Результаты самооценки:", selfRatingsFormatted);
-    console.log("📊 Результаты теста:", testScoresFormatted);
+    const payload = {
+        userName: userName,
+        userEmail: userEmail,
+        selfRatings: selfRatingsFormatted,
+        testScores: testScoresFormatted
+    };
+    
+    console.log("📊 Отправляемые данные:", payload);
     
     try {
         const response = await fetch(`${LOCAL_SERVER_URL}/recommend`, {
@@ -500,12 +502,7 @@ async function sendToLocalServer(userName, userEmail, selfRatings, testScores) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                userName: userName,
-                userEmail: userEmail,
-                selfRatings: selfRatingsFormatted,
-                testScores: testScoresFormatted
-            })
+            body: JSON.stringify(payload)
         });
         
         const data = await response.json();
